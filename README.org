@@ -35,3 +35,318 @@ single_parameter = 3
     *sqrt(case_insensitive+5)**5;
 #+END_EXAMPLE
 
+* Variables
+Let's declare 4 scalar variables.
+#+BEGIN_EXAMPLE
+variables
+    SAME_NAME_RULES_AS_PARAMS 'I am free and ready to be optimized'
+    WOULD_LIKE_SOME_BOUNDS 'bounds can be set later'
+    WOULD_LIKE_SOME_FIXING 'if level = lower bound = upper, variable is fixed'
+;
+
+variable OBJ 'at least one unrestricted var MUST be available (= f.obj.)';
+#+END_EXAMPLE
+
+Variables declared above can range from minus to plus infinity. You can set bounds either
+- during declaration
+  #+BEGIN_EXAMPLE
+  variable WLSB / lo 0, up 100 /;
+  #+END_EXAMPLE
+- after declaration
+  #+BEGIN_EXAMPLE
+  WOULD_LIKE_SOME_BOUNDS.lo = -inf;
+  WOULD_LIKE_SOME_BOUNDS.up = 100;
+  #+END_EXAMPLE
+
+To fix a variable:
+#+BEGIN_EXAMPLE
+variable WLSF / fx 10 /;
+WOULD_LIKE_SOME_FIXING.fx = 10;
+#+END_EXAMPLE
+
+To unfix it, reset lower and upper bounds.
+
+To initialize the level of a variable:
+#+BEGIN_EXAMPLE
+variable WLSL / l 50 /;
+WOULD_LIKE_SOME_BOUNDS.l = (WOULD_LIKE_SOME_BOUNDS.lo +
+         WOULD_LIKE_SOME_BOUNDS.up)/2;
+#+END_EXAMPLE
+
+* Equations
+Let's declare 3 equations and 3 variables.
+#+BEGIN_EXAMPLE
+equations
+    eqx_lessthan 'equations include inequalities'
+    eqy_greaterthan 'inequalities are never strict'
+    eqobj 'one equation MUST be used to define the objective function variable'
+;
+
+variables
+    X 'decision variable 1' / lo 0.1 /
+    Y 'decision variable 2' / up 1 /
+    OBJ 'objective function variable'
+;
+
+eqx_lessthan..
+    X =l= -Y**3+1
+;
+
+eqy_greaterthan..
+    Y =g= log(X)
+;
+
+eqobj..
+    OBJ =e= X - Y
+;
+#+END_EXAMPLE
+
+* Model and solve statements
+#+BEGIN_EXAMPLE
+model min_lp_some_equations 'include only some equations in the model'
+        / eq1, eq2 /;
+model max_nlp_all_equations 'include all equations' / all /;
+
+
+
+
+* 
+
+#+END_EXAMPLE
+
+Models have attributes. Some are used before the solve command.
+#+BEGIN_EXAMPLE
+min_lp_some_equations.sysout = 1;
+max_nlp_all_equations.solprint = 0;
+max_nlp_all_equations.iterlim = 1e6;
+max_nlp_all_equations.reslim = 3600;
+#+END_EXAMPLE
+
+The solve statement.
+#+BEGIN_EXAMPLE
+solve min_lp_some_equations minimizing OBJ using lp;
+#+END_EXAMPLE
+
+Some attributes are relevant after the solve command. Here we also use conditions with relational operators [gt (>), ge (>=), lt (<), le(<=), eq (=), ne (<>)] and boolean operators (not, or, and).
+#+BEGIN_EXAMPLE
+abort$(
+    (min_lp_some_equations.solvestat gt %Solvestat.Normal Completion%)
+    or (min_lp_some_equations.modelstat gt %ModelStat.Optimal%))
+         'Problem not solved correctly!';
+
+solve max_nlp_all_equations maximizing OBJ using nlp;
+
+abort$(not (
+    (max_nlp_all_equations.solvestat eq 1)
+    and (max_nlp_all_equations.modelstat le 2))) # %ModelStat.Locally Optimal%
+         'Problem not solved correctly!';
+#+END_EXAMPLE
+
+* Display
+#+BEGIN_EXAMPLE
+variable X / l 1 /, OBJ;
+equation eqobj;
+parameter a / 1 /;
+eqobj.. OBJ =e= a*X**0.1+4*X+4;
+model xsquared / all /;
+
+for(a = -1 to 1 by 1,
+    display a;
+    solve xsquared minimizing OBJ using nlp;
+
+    if(((xsquared.solvestat gt 1)
+        or (xsquared.modelstat gt 2)),
+        display 'Model not solved correctly, but still going on',
+            xsquared.solvestat, xsquared.modelstat;
+    else
+        display X.l, OBJ.l;
+    );
+);
+#+END_EXAMPLE
+
+To change displayed decimal points:
+#+BEGIN_EXAMPLE
+option X:0;
+display 'W/o decimals', X.l, OBJ.l;
+#+END_EXAMPLE
+
+* Sets
+Sets are equivalent to subscripts. They are used to operate on a series of items, e.g. for summing/looping. Subsets refer to one set.
+#+BEGIN_EXAMPLE
+sets
+    i 'rows' / 'i1' 'first row', 'i2' '2nd row', 'i3' 'etc...', 'i4', 'i5' /
+    j 'columns' / j1*j5 /
+    k 'other index' / a*c, d*f, g*i /
+    d 'numeric index' / 1*9 /
+    ifirst(i) 'first row' / i1 /
+    jfirst(j) 'first column, computed afterwards'
+    ij_diagonal(i,j) 'indices for diagonal elements' /
+        i1.j1, i2.j2, i3.j3, i4.j4, i5.j5 /
+    ij_diagonal2(i,j) 'diagonal elements, computet afterwards'
+    ij_upper_triangle(i,j) 'elements above diagonal' /
+        i1.(j1*j5), i2.(j2*j5), i3.(j3*j5), i4.(j4*j5), i5.j5 /
+    dodd(d) 'odd digits'
+;
+display ij_upper_triangle;
+jfirst(j) = yes$(j.ord eq 1);
+display jfirst;
+
+ij_diagonal2(i,j) = no;
+ij_diagonal2(i,j)$(i.ord eq j.ord) = yes;
+display ij_diagonal2;
+
+dodd(d) = yes$(mod(d.val, 2) eq 1);
+display dodd;
+#+END_EXAMPLE
+
+
+Examples of aliases, universal sets, max and min over set, and conditional assignments.
+#+BEGIN_EXAMPLE
+set movie /
+    'Creed' Rocky Balboa serves as a trainer and mentor to Adonis Johnson
+    'Legend' The story of two identical twin gangsters
+    'Miss You Already' The friendship between two life-long girlfriends is put to the test
+    'Room' A kidnapped mother and son make a daring escape
+    'The Boy' A nanny is shocked that her new family's boy is a life-sized doll
+    'The Danish Girl' A groundbreaking journey of a transgender pioneer
+    'Youth' A retired orchestra conductor receives an invitation from Queen Elizabeth II /;
+alias(movie, movie2);
+parameter rating(movie) /
+          'Creed' 7.8
+          'Legend' 7
+          'Miss You Already' 6.7
+          'Room' 8.3
+          'The Boy' 6.2
+          'The Danish Girl' 7.0
+          'Youth' 7.4 /;
+
+parameter rating_stats(*); set rated_movie(*,movie);
+rating_stats('best') = smax(movie, rating(movie));
+rating_stats('worst') = smin(movie, rating(movie));
+rated_movie('best', movie) = yes$(rating(movie) eq rating_stats('best'));
+loop(movie,
+rated_movie('above average', movie) =
+    yes$(rating(movie) gt sum(movie2, rating(movie2))/card(movie2));
+);
+#+END_EXAMPLE
+
+* Table data
+Movie example.
+#+BEGIN_EXAMPLE
+set movie / 'Creed', 'Legend', 'Miss You Already', 'Room', 'The Boy',
+            'The Danish Girl', 'Youth' /;
+alias(movie, movie2)
+set prop / rating 'from IMBD'
+           duration '[min]' /;
+
+table mdata(movie, prop)
+                    rating   duration
+'room'                 8.3        118
+'creed'                7.8        133
+'the danish girl'      7.0        119
+'the boy'              6.2         97
+'legend'               7.0        132
+'youth'                7.4        124
+'miss you already'     6.7        112
+;
+scalar time_budget 'Available time [min]' / 600 /;
+binary variable WATCH(movie); variable OBJ;
+equations eqobj, eqbudget;
+eqobj..
+    OBJ =e= sum(movie, WATCH(movie)*mdata(movie,'rating'))
+;
+eqbudget..
+    sum(movie, WATCH(movie)*mdata(movie,'duration')) =l= time_budget;
+;
+
+model movie_schedule / all /;
+solve movie_schedule maximising OBJ using mip;
+
+#+END_EXAMPLE
+
+Transport example.
+#+BEGIN_EXAMPLE
+sets
+     i   canning plants   / SEATTLE, SAN-DIEGO /
+     j   markets          / NEW-YORK, CHICAGO, TOPEKA / ;
+parameters
+     a(i)  capacity of plant i in cases
+       /    SEATTLE     350, SAN-DIEGO   600  /
+     b(j)  demand at market j in cases
+       /    NEW-YORK    325, CHICAGO     300, TOPEKA      275  / ;
+table d(i,j)  distance in thousands of miles
+                  NEW-YORK       CHICAGO      TOPEKA
+    SEATTLE          2.5           1.7          1.8
+    SAN-DIEGO        2.5           1.8          1.4  ;
+scalar f  freight in dollars per case per thousand miles  /90/ ;
+parameter c(i,j)  transport cost in thousands of dollars per case ;
+c(i,j) = f * d(i,j) / 1000 ;
+variables
+     X(i,j)  shipment quantities in cases
+     Z       total transportation costs in thousands of dollars ;
+equations
+     cost        define objective function
+     supply(i)   observe supply limit at plant i
+     demand(j)   satisfy demand at market j ;
+cost ..        Z  =E=  sum((i,j), c(i,j)*X(i,j)) ;
+supply(i) ..   sum(j, X(i,j))  =l=  a(i) ;
+demand(j) ..   sum(i, X(i,j))  =g=  b(j) ;
+model transport /all/; solve transport using LP minimizing Z;
+#+END_EXAMPLE
+
+* Put
+#+BEGIN_EXAMPLE
+sets scen_a / 1*3 /, scen_b / 1*3 /;
+parameter a, b;
+variable X, OBJ;
+equation eqobj; eqobj.. OBJ =e= a*X**2-b*X+1;
+model xsquared / all /;
+
+file fileid / 'output.txt' /;
+put fileid;
+
+put '      ';
+loop(scen_b, b = scen_b.val*3; put 'b', scen_b.tl:0, '=', b:0:0, '  ');
+put /;
+loop(scen_a,
+    a = scen_a.val*2;
+    put 'a', scen_a.tl:0, '=', a:0:0;
+    loop(scen_b,
+        b = scen_b.val*3;
+        solve xsquared minimizing OBJ using nlp;
+        put X.l:6:1;
+    );
+    put /;
+);
+
+putclose fileid;
+
+#+END_EXAMPLE
+
+* Marginals
+Shadow prices, or marginal values, of constraints represent the maximal price at which we should be willing to buy additional units of a resource, or the minimal price at which we should be willing to sell units of the resource.
+#+BEGIN_EXAMPLE
+variables
+    XCARS Thousands of cars produced / lo 0, up 22.5 /
+    XTRUCKS Thousands of trucks produced / lo 0, up 15 /
+    R  'Profit (revenue) M$'
+;
+
+equations
+    revenue 'Revenue equation'
+    cap_metal_dep 'Sheet metal stamping dept. capacity'
+    cap_engine_dep 'Engine assembly dept. capacity'
+    cap_auto_dep 'Automobile assembly dept. capacity'
+    cap_truck_dep 'Truck assembly dept. capacity'
+;
+revenue..     R =E= 3*XCARS + 2.5*XTRUCKS;
+cap_metal_dep..   4*XCARS + 2.86*XTRUCKS =l= 100;
+cap_engine_dep..  3*XCARS + 6*XTRUCKS =l= 100;
+cap_auto_dep..    4.44*XCARS =l= 100;
+cap_truck_dep..   6.67*XTRUCKS =l= 100;
+
+model cars_and_trucks / all /;
+solve cars_and_trucks maximizing R using LP;
+
+display cap_metal_dep.M, cap_engine_dep.M, cap_auto_dep.M, cap_truck_dep.M;
+#+END_EXAMPLE
