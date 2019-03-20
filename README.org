@@ -1,0 +1,29 @@
+* Comments
+#+BEGIN_EXAMPLE
+* Comment lines start with a "*"
+* To have in-line comments, e.g. after a "#", use
+$eolcom #
+
+parameters # let's declare 7 scalar parameters, of which 3 are also initialized.
+    param_name_up_to_63_characters  explanatory text up to 255 char long
+    no_space_or_special_char 'spaces ok here, and special chars too w/ quotes'
+    cAse_iNsEnSiTiVe    "don't forget the unit [m/s]"
+    long_enough_to_be_self_explanatory / 0.1 /
+    param1  'comma needed if more params on same line' / 1 /, param2 / 2 /
+    param3  "otherwise comma between params is optional"
+;
+
+* You can evaluate math expressions and assign them to previously declared
+* parameters
+case_insensitive = 1+1;
+
+* Another parameter
+parameter single_parameter '"parameter" or "parameters" are equivalent';
+
+* In math expressions you can use only parameters that have been assigned
+* some value before.
+single_parameter = 3
+* Be aware of the spaces before asterisks!
+    *sqrt(case_insensitive+5)**5;
+
+#+END_EXAMPLE
